@@ -11,7 +11,7 @@ ui <- fluidPage(
       actionButton("search_paragraphs", "Search Paragraphs"),
       textInput("annotation", "Add Annotation"),
       selectInput("paragraph_number", "Paragraph Number", choices = NULL),
-      actionButton("add_annotation", "Add Annotation"),
+      actionButton("add_annotation", "Annotate"),
       downloadButton("download_csv", "Download CSV")
     ),
     mainPanel(
@@ -64,7 +64,7 @@ server <- function(input, output, session) {
                              stringsAsFactors = FALSE))
     }
     paragraphs_df(df)
-    updateSelectInput(session, "paragraph_number", choices = NULL)
+    updateSelectInput(session, "paragraph_number", choices = df$start_line)
   })
   
   search_paragraphs_df <- function(search_string) {
@@ -84,25 +84,20 @@ server <- function(input, output, session) {
     }
   })
   
-  output$paragraphs_table <- renderDT({
-    dt_data <- reactive_search_results()
-    
-    # Add annotation input dynamically
-    if (!is.null(input$add_annotation)) {
-      print("Add Annotation Button Clicked")
-      print(paste("Input Paragraph Number:", input$paragraph_number))
-      if (!is.null(input$paragraph_number) && input$paragraph_number != "") {
-        # Update the corresponding row in the datatable with the annotation input
-        paragraph_index <- which(dt_data$start_line == input$paragraph_number)
-        dt_data$annotations[paragraph_index] <- input$annotation
-      }
+  observeEvent(input$add_annotation, {
+    req(input$annotation, input$paragraph_number)
+    paragraphs <- paragraphs_df()
+    paragraph_idx <- which(paragraphs$start_line == as.numeric(input$paragraph_number))
+    if (length(paragraph_idx) > 0) {
+      paragraphs$annotations[paragraph_idx] <- input$annotation
+      paragraphs_df(paragraphs)
     }
-    
-    print(dt_data)  # Print the dataframe to check if annotation inputs are added
-    
-    datatable(dt_data, rownames = FALSE, escape = FALSE, selection = "none")
   })
   
+  output$paragraphs_table <- renderDT({
+    dt_data <- reactive_search_results()
+    datatable(dt_data, rownames = FALSE, escape = FALSE, selection = "none")
+  })
   
   observe({
     if (!is.null(paragraphs_df())) {
